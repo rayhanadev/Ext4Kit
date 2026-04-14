@@ -47,6 +47,13 @@
 			);
 			target = 71D9ABE82F8DBE9200883D8B /* Ext4KitExtension */;
 		};
+		EF53000000000000EF530002 /* Exceptions for "lwext4-src" folder in "Ext4KitExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				CMakeLists.txt,
+			);
+			target = 71D9ABE82F8DBE9200883D8B /* Ext4KitExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -61,6 +68,15 @@
 				71D9ABF42F8DBE9200883D8B /* Exceptions for "Ext4KitExtension" folder in "Ext4KitExtension" target */,
 			);
 			path = Ext4KitExtension;
+			sourceTree = "<group>";
+		};
+		EF53000000000000EF530001 /* lwext4-src */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EF53000000000000EF530002 /* Exceptions for "lwext4-src" folder in "Ext4KitExtension" target */,
+			);
+			name = "lwext4-src";
+			path = Vendor/lwext4/src;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -88,6 +104,7 @@
 			children = (
 				71D9ABD92F8DBE7000883D8B /* Ext4Kit */,
 				71D9ABEA2F8DBE9200883D8B /* Ext4KitExtension */,
+				EF53000000000000EF530001 /* lwext4-src */,
 				71D9ABD82F8DBE7000883D8B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -142,6 +159,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				71D9ABEA2F8DBE9200883D8B /* Ext4KitExtension */,
+				EF53000000000000EF530001 /* lwext4-src */,
 			);
 			name = Ext4KitExtension;
 			packageProductDependencies = (
@@ -285,7 +303,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.3;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -343,7 +361,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.3;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -356,6 +374,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -388,6 +407,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -425,7 +445,18 @@
 				DEVELOPMENT_TEAM = GXU29PTM63;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"CONFIG_USE_DEFAULT_CFG=1",
+					"CONFIG_DEBUG_PRINTF=0",
+					"CONFIG_HAVE_OWN_ERRNO=0",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/lwext4/include",
+					"$(SRCROOT)/Vendor/lwext4/include/misc",
+				);
 				INFOPLIST_FILE = Ext4KitExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ext4KitExtension;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -436,12 +467,17 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.4;
 				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-w",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.rayhanadev.Ext4Kit.Ext4KitExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = Ext4KitExtension/Ext4KitBridge.h;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -457,7 +493,18 @@
 				DEVELOPMENT_TEAM = GXU29PTM63;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"CONFIG_USE_DEFAULT_CFG=1",
+					"CONFIG_DEBUG_PRINTF=0",
+					"CONFIG_HAVE_OWN_ERRNO=0",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/lwext4/include",
+					"$(SRCROOT)/Vendor/lwext4/include/misc",
+				);
 				INFOPLIST_FILE = Ext4KitExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ext4KitExtension;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -468,12 +515,17 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.4;
 				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-w",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.rayhanadev.Ext4Kit.Ext4KitExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = Ext4KitExtension/Ext4KitBridge.h;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 			};

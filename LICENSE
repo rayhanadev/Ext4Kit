@@ -1,0 +1,31 @@
+MIT License
+
+Copyright (c) 2026 Rayhan Noufal Arayilakath
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+This License applies to Ext4Kit's own source code: everything in
+`Ext4Kit/` and `Ext4KitExtension/`, plus project configuration files.
+
+Ext4Kit statically links against lwext4 (https://github.com/gkostka/lwext4),
+which is vendored as a git submodule under `Vendor/lwext4/` and carries its
+own mixed licensing. See THIRD_PARTY_LICENSES.md for the full breakdown and
+for the practical effect on distributed binaries.

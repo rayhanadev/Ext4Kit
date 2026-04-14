@@ -1,0 +1,19 @@
+## macOS
+.DS_Store
+
+## Xcode
+xcuserdata/
+*.xcuserstate
+build/
+DerivedData/
+*.moved-aside
+
+## Swift Package Manager
+.build/
+Packages/
+Package.resolved
+.swiftpm/
+
+## lwext4 build artifacts (we vendor sources, not builds)
+Vendor/lwext4/build/
+Vendor/lwext4/**/*.o
