@@ -19,16 +19,29 @@ vendored as a submodule and compiled directly into the extension.
   return real entries via `ext4_dir_open` / `ext4_dir_entry_next`.
 - `stat` returns real inode data: type, mode, link count, size, and
   access/modify/change times from on-disk inodes via `ext4_raw_inode_fill`.
+- `cat` reads real file contents through `ext4_fopen` / `ext4_fseek` /
+  `ext4_fread`, including multi-block files. Deterministic multi-read
+  integrity is verified by `md5` producing an identical hash across
+  consecutive runs against a 50 KiB random-data file.
+- `readlink` and transparent symlink traversal via `ext4_readlink`. Both
+  relative (`link → file.txt`) and absolute (`link → /tmp/something`)
+  targets resolve correctly; `cat symlink` follows to the target file.
 - Clean unmount through `ext4_umount` on `deactivate`.
 - All mutating operations return `EROFS`. Write support isn't implemented.
 
 **Not yet:**
-- File contents. `cat /mnt/file.txt` returns `Operation not supported` because
-  `FSVolume.ReadWriteOperations` is not yet implemented.
-- Symbolic link resolution (`readSymbolicLink` returns `EINVAL`).
-- Any write path: create, delete, rename, mkdir, chmod, chown, truncate.
-- `inline_data` and `metadata_csum` ext4 features — lwext4 doesn't implement
-  them, so images must be created with `mkfs.ext4 -O ^inline_data,^metadata_csum`.
+- Any write path: create, delete, rename, mkdir, chmod, chown, truncate,
+  write file content. Every mutating `FSVolume.Operations` method and
+  `write(contents:to:at:)` all return `EROFS`.
+- Extended attributes (`FSVolume.XattrOperations`).
+- Kernel-offloaded I/O (`FSVolume.KernelOffloadedIOOperations`). Every
+  read currently round-trips through the extension process.
+- Persistent open-file handles. Each `read` call opens and closes the
+  lwext4 file handle internally. Correct but wasteful for large files;
+  `FSVolume.OpenCloseOperations` would let us amortize.
+- `inline_data` and `metadata_csum` ext4 features — lwext4 doesn't
+  implement them, so test images must be created with
+  `mkfs.ext4 -O ^inline_data,^metadata_csum`.
 
 ## Repository layout
 

@@ -17,7 +17,7 @@ import os
 /// FSKit's `mount(options:)` / `unmount()` protocol methods are never invoked
 /// on this topology — FSKit collapses them into `activate`/`deactivate`. The
 /// implementations below exist only for protocol conformance.
-final class Ext4Volume: FSVolume, FSVolume.Operations {
+final class Ext4Volume: FSVolume, FSVolume.Operations, FSVolume.ReadWriteOperations {
 
     private let log = Logger(subsystem: "dev.ext4kit.fs", category: "volume")
 
@@ -255,7 +255,38 @@ final class Ext4Volume: FSVolume, FSVolume.Operations {
         _ item: FSItem,
         replyHandler: @escaping (FSFileName?, Error?) -> Void
     ) {
-        replyHandler(nil, fs_errorForPOSIXError(Int32(EINVAL)))
+        guard let ext4Item = item as? Ext4Item else {
+            replyHandler(nil, fs_errorForPOSIXError(Int32(EINVAL)))
+            return
+        }
+
+        // 4 KiB covers every realistic symlink target. ext4 stores short
+        // targets inline in the inode and longer ones in a single block,
+        // and userspace is capped at `PATH_MAX` (1024 on macOS, 4096 on
+        // Linux) anyway, so a truncated read past this ceiling would be
+        // unresolvable on either platform regardless.
+        var targetBytes = [CChar](repeating: 0, count: 4096)
+        var rcnt = size_t(0)
+        let rc = ext4Item.absolutePath.withCString { path in
+            targetBytes.withUnsafeMutableBufferPointer { buf in
+                ext4_readlink(path, buf.baseAddress, buf.count, &rcnt)
+            }
+        }
+        guard rc == EOK else {
+            log.error(
+                """
+                ext4_readlink failed path='\(ext4Item.absolutePath, privacy: .public)' \
+                rc=\(rc, privacy: .public)
+                """)
+            replyHandler(nil, fs_errorForPOSIXError(Int32(EIO)))
+            return
+        }
+
+        let target = targetBytes.withUnsafeBufferPointer { buf -> String in
+            let bytes = UnsafeRawBufferPointer(start: buf.baseAddress, count: Int(rcnt))
+            return String(decoding: bytes, as: UTF8.self)
+        }
+        replyHandler(FSFileName(string: target), nil)
     }
 
     // MARK: mutating operations — all EROFS
@@ -308,6 +339,75 @@ final class Ext4Volume: FSVolume, FSVolume.Operations {
         replyHandler: @escaping (FSFileName?, Error?) -> Void
     ) {
         replyHandler(nil, fs_errorForPOSIXError(Int32(EROFS)))
+    }
+
+    // MARK: FSVolume.ReadWriteOperations
+
+    func read(
+        from item: FSItem,
+        at offset: off_t,
+        length: Int,
+        into buffer: FSMutableFileDataBuffer,
+        replyHandler: @escaping (Int, Error?) -> Void
+    ) {
+        guard let ext4Item = item as? Ext4Item else {
+            replyHandler(0, fs_errorForPOSIXError(Int32(EINVAL)))
+            return
+        }
+
+        var file = ext4_file()
+        let openRC = ext4Item.absolutePath.withCString { path in
+            "rb".withCString { flags in
+                ext4_fopen(&file, path, flags)
+            }
+        }
+        guard openRC == EOK else {
+            log.error(
+                """
+                ext4_fopen failed path='\(ext4Item.absolutePath, privacy: .public)' \
+                rc=\(openRC, privacy: .public)
+                """)
+            replyHandler(0, fs_errorForPOSIXError(Int32(EIO)))
+            return
+        }
+        defer { _ = ext4_fclose(&file) }
+
+        if offset > 0 {
+            let seekRC = ext4_fseek(&file, Int64(offset), UInt32(SEEK_SET))
+            guard seekRC == EOK else {
+                log.error("ext4_fseek failed offset=\(offset) rc=\(seekRC, privacy: .public)")
+                replyHandler(0, fs_errorForPOSIXError(Int32(EIO)))
+                return
+            }
+        }
+
+        // The caller-supplied buffer is sized by FSKit; clamp the read to the
+        // smaller of the requested length and the buffer capacity so lwext4
+        // never runs past the end of it.
+        let capacity = min(length, Int(buffer.length))
+        var actuallyRead = size_t(0)
+
+        let readRC = buffer.withUnsafeMutableBytes { raw -> Int32 in
+            guard let base = raw.baseAddress else { return Int32(EFAULT) }
+            return ext4_fread(&file, base, capacity, &actuallyRead)
+        }
+
+        guard readRC == EOK else {
+            log.error("ext4_fread failed rc=\(readRC, privacy: .public)")
+            replyHandler(Int(actuallyRead), fs_errorForPOSIXError(Int32(EIO)))
+            return
+        }
+
+        replyHandler(Int(actuallyRead), nil)
+    }
+
+    func write(
+        contents: Data,
+        to item: FSItem,
+        at offset: off_t,
+        replyHandler: @escaping (Int, Error?) -> Void
+    ) {
+        replyHandler(0, fs_errorForPOSIXError(Int32(EROFS)))
     }
 
     // MARK: enumerate
