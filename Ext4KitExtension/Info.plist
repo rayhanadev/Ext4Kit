@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>EXAppExtensionAttributes</key>
+    <dict>
+        <key>EXExtensionPointIdentifier</key>
+        <string>com.apple.fskit.fsmodule</string>
+
+        <key>FSSupportsBlockResources</key>
+        <true/>
+
+        <key>FSSupportsPathURLs</key>
+        <false/>
+        <key>FSSupportsGenericURLResources</key>
+        <false/>
+        <key>FSSupportsServerURLs</key>
+        <false/>
+        <key>FSRequiresSecurityScopedPathURLResources</key>
+        <false/>
+
+        <key>FSShortName</key>
+        <string>ext4</string>
+
+        <key>FSPersonalities</key>
+        <dict>
+            <key>ext4</key>
+            <dict>
+                <key>FSName</key>
+                <string>ext4</string>
+                <key>FSShortName</key>
+                <string>ext4</string>
+                <key>FSIsCaseSensitive</key>
+                <true/>
+                <key>FSIsCasePreserving</key>
+                <true/>
+            </dict>
+        </dict>
+
+        <key>FSMediaTypes</key>
+        <dict>
+            <key>0FC63DAF-8483-4772-8E79-3D69D8477DE4</key>
+            <dict/>
+        </dict>
+
+        <key>FSActivateOptionSyntax</key>
+        <dict>
+            <key>shortOptions</key>
+            <string>o:</string>
+        </dict>
+
+        <key>FSCheckOptionSyntax</key>
+        <dict>
+            <key>shortOptions</key>
+            <string>nypfv</string>
+        </dict>
+
+        <key>FSFormatOptionSyntax</key>
+        <dict>
+            <key>shortOptions</key>
+            <string>L:b:I:N:</string>
+        </dict>
+    </dict>
+</dict>
+</plist>
