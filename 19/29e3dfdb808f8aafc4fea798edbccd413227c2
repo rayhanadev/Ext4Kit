@@ -1,0 +1,31 @@
+.gitignore
+  s_05a638597b3cc6::t_6b64edd7d76c29 20-24
+Benchmarks/Makefile
+  s_05a638597b3cc6::t_19dbbd7c3f4f91 1-41
+Benchmarks/bench.c
+  s_05a638597b3cc6::t_3ef98b0e33b340 22-27
+  s_05a638597b3cc6::t_3389b1e07f7836 744-745,755-757,759-771
+  s_05a638597b3cc6::t_82620c2bc48e4a 699
+  s_05a638597b3cc6::t_6278a19b935ecb 1-21,28-36,38-300,304-334,373-435,707-743,746-754,758,772-788,790-807
+  s_05a638597b3cc6::t_6901d997bf9490 789
+  s_05a638597b3cc6::t_87a475e18a32a2 436-580,583-698,700-706
+  s_05a638597b3cc6::t_804d1bd4d8823e 301-303,335-372
+  s_05a638597b3cc6::t_6edcfcaf9c2f4d 37
+  s_05a638597b3cc6::t_f54f5b59b426c5 581-582
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "1929e3dfdb808f8aafc4fea798edbccd413227c2",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
