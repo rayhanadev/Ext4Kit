@@ -1,0 +1,19 @@
+README.md
+  s_05a638597b3cc6::t_2a75416d4dfcb4 3,5-8,10-12,15-17,20-43,47-53,55,63-69,71-73,75,77,80-82,85,88,91,94,97,100,103,106,109-129,131-141,143-145,148-152,155-159,161-162,165-166,169,171,173-187,190-207,212-226,229,231-236,240-249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "14715bd89f9923b374ea05bdd6a61605b3ee0a06",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
