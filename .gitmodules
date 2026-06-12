@@ -1,3 +1,4 @@
 [submodule "Vendor/lwext4"]
 	path = Vendor/lwext4
-	url = https://github.com/gkostka/lwext4.git
+	url = https://github.com/rayhanadev/lwext4.git
+	branch = ext4kit-patches
