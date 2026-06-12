@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build (Debug + Release)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Build Debug
+        run: |
+          xcodebuild -project Ext4Kit.xcodeproj -scheme Ext4KitExtension \
+            -configuration Debug CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" build
+
+      - name: Build Release
+        run: |
+          xcodebuild -project Ext4Kit.xcodeproj -scheme Ext4KitExtension \
+            -configuration Release CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" build
+
+  harness:
+    name: lwext4 harness (verify + fuzz + soak)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build harness
+        run: make -C Benchmarks CACHE=1024
+
+      - name: Benchmarks + data verification
+        run: ./Benchmarks/bench-cache1024 "$RUNNER_TEMP/ci.img" --verify
+
+      - name: Corrupt-image fuzz smoke (40 rounds)
+        run: ./Benchmarks/bench-cache1024 "$RUNNER_TEMP/fuzz.img" --fuzz 40
+
+      - name: Mixed-op soak (15s)
+        run: ./Benchmarks/bench-cache1024 "$RUNNER_TEMP/soak.img" --soak 15
