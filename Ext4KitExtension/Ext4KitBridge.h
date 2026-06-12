@@ -12,6 +12,8 @@
 #include <ext4_blockdev.h>
 #include <ext4_inode.h>
 #include <ext4_super.h>
+#include <ext4_crc32.h>
+#include <ext4_mkfs.h>
 #include <ext4.h>
 
 #include "Ext4KitBlockDev.h"

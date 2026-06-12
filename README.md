@@ -1,6 +1,6 @@
 # Ext4Kit
 
-A read-only ext4 filesystem driver for macOS, built on Apple's **FSKit**.
+A read/write ext4 filesystem driver for macOS, built on Apple's **FSKit**.
 Ext4Kit ships as an app extension (`.appex`) hosted by a thin SwiftUI app — no
 kernel extensions, no SIP workarounds. The filesystem itself is provided by
 [lwext4](https://github.com/gkostka/lwext4), a portable C ext2/3/4 library
@@ -26,22 +26,143 @@ vendored as a submodule and compiled directly into the extension.
 - `readlink` and transparent symlink traversal via `ext4_readlink`. Both
   relative (`link → file.txt`) and absolute (`link → /tmp/something`)
   targets resolve correctly; `cat symlink` follows to the target file.
-- Clean unmount through `ext4_umount` on `deactivate`.
-- All mutating operations return `EROFS`. Write support isn't implemented.
+- Clean unmount through `ext4_journal_stop` + `ext4_umount` on `deactivate`.
+- `setAttributes` persists `chmod`, `chown`, `utimes`, and file `truncate`
+  (both shrink and zero-fill grow) via lwext4's `ext4_mode_set` /
+  `ext4_owner_set` / `ext4_*time_set` / `ext4_ftruncate`. `touch file`
+  (existing file) and `chmod 755 file` actually update on-disk state.
+- Full namespace mutation: `mkdir`, `rmdir` (with proper `ENOTEMPTY`),
+  `rm`, `mv` — including rename-over-existing and cross-directory moves —
+  `ln` (hard links, with `EMLINK` at ext4's 65 000-link ceiling), `ln -s`,
+  and `mkfifo`/`mknod`-style special files via `createItem`, `removeItem`,
+  `renameItem`, `createLink`, and `createSymbolicLink`. Renaming a directory
+  into its own subtree is refused (`EINVAL`) — lwext4 itself has no cycle
+  guard.
+- File writes through `write(contents:to:at:)` via `ext4_fwrite`, including
+  writes past EOF (the gap is zero-filled — lwext4 has no sparse files).
+  `echo hi > file`, `cp`, `dd`, and Finder copies persist for real.
+- Persistent open-file handles via `FSVolume.OpenCloseOperations`: one
+  lwext4 handle per inode is held between `openItem`/`closeItem` (hard
+  links share it), so sequential reads/writes don't reopen per call.
+- Extended attributes via `FSVolume.XattrOperations`. macOS xattr names map
+  into the Linux `user.` namespace (`com.apple.quarantine` is stored as
+  `user.com.apple.quarantine`), so they round-trip to Linux as ordinary
+  user xattrs. Values are capped at one filesystem block.
+- Volume rename via `FSVolume.RenameOperations` (`diskutil rename`): the
+  superblock label is rewritten in place with its checksum recomputed.
+- POSIX-ish timestamp maintenance. lwext4 updates **no** timestamps on its
+  own (new inodes are born with epoch-zero times), so the volume stamps
+  atime/mtime/ctime on create, mtime/ctime on write/truncate, ctime on
+  chmod/chown/link/xattr changes, and parent-directory mtime/ctime on every
+  namespace operation.
+- Directory-enumeration verifiers: each directory carries a generation
+  counter bumped on every mutation, so a `readdir` resumed across a
+  concurrent create/delete is invalidated with FSKit's
+  `invalidDirectoryCookie` error (which the kernel handles gracefully)
+  instead of silently skipping or duplicating entries.
+- Open-unlink emulation: removing (or renaming over) the last link of an
+  open file parks it under a hidden `.ext4kit-orphan-<ino>` name in the
+  root instead of freeing the inode, so reads/writes/ftruncate through the
+  still-open descriptor keep working; the inode is freed on last close.
+  Stale orphans from a crash are swept at the next mount.
+- Stock `mkfs.ext4 -L LABEL image.img` images mount, including
+  `metadata_csum` volumes. lwext4 maintains every metadata checksum on
+  write (group descriptors, inodes, directory tails, extents, bitmaps,
+  superblock) — but it always seeds them from the volume UUID, so a volume
+  whose UUID was changed after format (`tune2fs -U`) is automatically
+  degraded to read-only rather than risking wrongly-seeded checksums.
+- Read-only mounts honored end to end: `mount -o ro|rdonly`, `mount -r`,
+  and write-protected media all mount lwext4 read-only, skip journal
+  replay, and gate every mutating operation with `EROFS`.
+- Format and check via the FSKit maintenance shims:
+  `newfs_fskit -t ext4 -L LABEL [-b 4096] /dev/diskNsM` creates a fresh
+  journaled ext4 via lwext4's mkfs, and `fsck_fskit -t ext4 /dev/diskNsM`
+  runs a read-only structural check (superblock, features, trial mount —
+  lwext4 has no repair engine, so it never modifies the volume).
 
 **Not yet:**
-- Any write path: create, delete, rename, mkdir, chmod, chown, truncate,
-  write file content. Every mutating `FSVolume.Operations` method and
-  `write(contents:to:at:)` all return `EROFS`.
-- Extended attributes (`FSVolume.XattrOperations`).
-- Kernel-offloaded I/O (`FSVolume.KernelOffloadedIOOperations`). Every
-  read currently round-trips through the extension process.
-- Persistent open-file handles. Each `read` call opens and closes the
-  lwext4 file handle internally. Correct but wasteful for large files;
-  `FSVolume.OpenCloseOperations` would let us amortize.
-- `inline_data` and `metadata_csum` ext4 features — lwext4 doesn't
-  implement them, so test images must be created with
-  `mkfs.ext4 -O ^inline_data,^metadata_csum`.
+- Kernel-offloaded I/O (`FSVolumeKernelOffloadedIOOperations`). Every
+  read/write round-trips through the extension process. lwext4 exposes no
+  public extent-mapping API, so `blockmapFile` would have to reach into its
+  internals.
+- Preallocation (`FSVolume.PreallocateOperations`): lwext4 cannot allocate
+  blocks without extending the file size, which is not what `fallocate`
+  semantics promise, so the protocol isn't adopted.
+- Sparse files: writes past EOF physically zero-fill the gap (lwext4 can't
+  truncate-up or seek past EOF). Growing a file by gigabytes therefore does
+  real zero I/O — and stalls other volume operations while it runs, since
+  all lwext4 calls are serialized. Grows larger than the remaining free
+  space fail fast with `ENOSPC` instead of filling the disk first.
+- Non-UTF-8 entry names (creatable from Linux, where names are raw bytes)
+  are hidden from enumeration and can't be looked up or deleted from macOS;
+  a directory containing only such entries reports `ENOTEMPTY` on `rmdir`.
+- BSD file flags (`chflags uchg` etc.) — reported as 0, never consumed.
+- Device-node numbers: FSKit's attribute set carries no `rdev`, so
+  char/block device nodes are created with device number 0.
+- `atime` is not updated on reads (deliberate, `noatime` behavior).
+- `inline_data` — lwext4 can't read files whose content is stored in the
+  inode. Images must be formatted with `mkfs.ext4 -O ^inline_data`.
+
+## Performance
+
+Three measured optimizations ship in the default build (all numbers from
+`Benchmarks/bench.c`, a harness that drives the vendored lwext4 with the same
+call patterns `Ext4Volume` uses, against a file-backed block device, counting
+physical block I/Os via lwext4's built-in `bread_ctr`/`bwrite_ctr`):
+
+- **lwext4 block cache: 8 → 1024 buffers** (`CONFIG_BLOCK_DEV_CACHE_SIZE=1024`
+  in the extension's build settings, ≈4 MiB). The cache only serves metadata
+  (file contents bypass it), and 8 buffers couldn't hold even one path's
+  directory blocks: stat of an 8-deep path cost **18 physical reads per
+  call** (360k reads for 20k stats); with 1024 buffers it costs **zero** on a
+  warm cache (~10× wall clock). Creates dropped from ~32 reads/file to ~2.
+  Lookup is an RB-tree (O(log n)) and buffers allocate lazily, so a large
+  cap has no downside besides memory.
+- **`ioSize` (statfs `f_iosize`/`st_blksize`): 4 KiB → 128 KiB.** This sizes
+  the I/O that *applications* issue (stdio, `cp`, Finder); the kernel passes
+  big requests through to the extension whole, and lwext4 coalesces
+  contiguous file runs into single device transfers — but every tiny write
+  call is a full journal transaction. Measured on 64 MiB sequential writes:
+  4 KiB chunks = 100 MiB/s and 180k device writes; 128 KiB = 322 MiB/s and
+  5.4k writes. (Apple's msdos module uses 32 KiB; 1 MiB added nothing here.)
+- **O(1) directory-enumeration resume.** Cookies are now lwext4 directory
+  byte offsets (`dir.next_off`) instead of entry counts, so resuming a
+  paged `readdir` no longer re-walks from the start (it was O(n²) across a
+  listing). At 20 000 entries: positional resume 0.43 s, offset resume
+  0.003 s (**~150×**). Stale offsets are fenced by the per-directory
+  verifier plus a bounds check (lwext4's iterator crashes on out-of-range
+  seeds).
+
+Measured and **rejected**: enabling lwext4's global write-back cache while
+journaling — the deferred checkpoints stall the journal head and the
+journal-full purge path makes it *slower* than write-through (40k vs 36k
+writes on a create storm). The journal itself costs ~3.5× on metadata
+storms (every operation is a synchronous commit); it stays on because crash
+consistency is the point.
+
+Not yet attempted, in expected-impact order: kernel-offloaded I/O
+(`FSVolumeKernelOffloadedIOOperations` — Apple's msdos module moves file
+data this way, eliminating per-read upcalls entirely; needs real-mount
+testing), and routing lwext4's metadata I/O through
+`FSBlockDeviceResource.metadataRead/Write` (kernel buffer cache) — risky to
+mix with the raw-`pread` path, so deferred.
+
+Run the harness yourself:
+
+```sh
+cd Benchmarks
+make CACHE=1024            # mirror the shipping config (or CACHE=8 for old)
+./bench-cache1024 /tmp/bench.img --verify
+./bench-cache1024 /tmp/big.img --files 20000 --size-mb 1024   # big-dir tests
+./bench-cache1024 /tmp/fuzz.img --fuzz 300     # corrupt-image robustness
+./bench-cache1024 /tmp/soak.img --soak 60      # randomized mixed-op endurance
+```
+
+The fuzz mode corrupts random metadata bytes and mounts/walks/writes the
+result (graceful errors pass; crashes and hangs fail — 300/300 rounds clean
+as of this writing). The soak mode runs randomized create/write/read/
+rename/unlink/truncate traffic and verifies structure plus a data pattern
+after remount; CI runs both on every push.
 
 ## Repository layout
 
@@ -52,6 +173,7 @@ Ext4Kit/
 │   ├── Ext4KitApp.swift
 │   ├── ContentView.swift
 │   └── Assets.xcassets/
+├── Benchmarks/                lwext4 benchmark harness (see Performance)
 ├── Ext4KitExtension/          the .appex — FSKit File System Extension
 │   ├── ExtensionMain.swift    @main UnaryFileSystemExtension entry point
 │   ├── Ext4FileSystem.swift   FSUnaryFileSystem: probe + load/unload resource
@@ -77,14 +199,18 @@ Inside the extension process:
 2. `Ext4FileSystem.loadResource` constructs an `Ext4BlockDevice` that adapts
    `FSBlockDeviceResource` to lwext4's `ext4_blockdev` interface, registers it
    with `ext4_device_register`, and hands back an `Ext4Volume`.
-3. `Ext4Volume.activate` calls `ext4_mount` read-only and caches the superblock
-   pointer returned by `ext4_get_sblock`.
-4. VFS operations (`lookupItem`, `getAttributes`, `enumerateDirectory`, …) run
-   against lwext4's path-based API. `Ext4Item` carries a full absolute path
-   (e.g. `/ext4kit/dir1/inside.txt`) so path-based lookups can address any
-   subtree entry.
-5. On unmount, `Ext4Volume.deactivate` calls `ext4_umount` and
-   `Ext4FileSystem.unloadResource` unregisters the block device.
+3. `Ext4Volume.activate` calls `ext4_mount` read/write, replays the journal
+   (`ext4_recover`), starts journaling (`ext4_journal_start`), and caches the
+   superblock pointer returned by `ext4_get_sblock`.
+4. VFS operations (`lookupItem`, `createItem`, `write`, `enumerateDirectory`,
+   …) run against lwext4's path-based API. `Ext4Item` records its parent item
+   and entry name; absolute paths (e.g. `/ext4kit/dir1/inside.txt`) are
+   computed on demand by walking the parent chain, so renaming a directory
+   never strands cached descendants. All operations are serialized behind one
+   recursive lock — lwext4 has no internal locking whatsoever.
+5. On unmount, `Ext4Volume.deactivate` closes open handles, stops the journal,
+   and calls `ext4_umount`; `Ext4FileSystem.unloadResource` unregisters the
+   block device.
 
 The block-device adapter is half C, half Swift. `Ext4KitBlockDev.c` implements
 the four function pointers lwext4's `ext4_blockdev_iface` expects (`open`,
@@ -140,15 +266,15 @@ pluginkit -e use -i com.rayhanadev.Ext4Kit.Ext4KitExtension
 
 ### 1. Create an ext4 test image
 
-e2fsprogs 1.47+ enables `inline_data` and `metadata_csum` by default; lwext4
-doesn't support either, so disable them when formatting:
+e2fsprogs 1.47+ enables `inline_data` by default; lwext4 can't read inline
+data, so disable that bit when formatting. `metadata_csum` is fine to leave on.
 
 ```sh
 mkdir -p ~/ext4kit-test && cd ~/ext4kit-test
 dd if=/dev/zero of=test.img bs=1m count=100
 docker run --rm --privileged -v "$PWD":/w alpine sh -c \
   "apk add --no-cache e2fsprogs util-linux >/dev/null && \
-   mkfs.ext4 -F -O ^inline_data,^metadata_csum \
+   mkfs.ext4 -F -O ^inline_data \
      -L TESTVOL -U $(uuidgen) /w/test.img && \
    mkdir -p /mnt && mount -o loop /w/test.img /mnt && \
    echo 'hello from ext4kit' > /mnt/hello.txt && \
@@ -191,7 +317,35 @@ ls -la /tmp/ext4test/dir1           # inside.txt
 stat /tmp/ext4test/hello.txt        # real inode, size, mode, mtime
 ```
 
-### 5. Unmount and detach
+### 5. Exercise the write path
+
+```sh
+cd /tmp/ext4test
+sudo mkdir newdir                              # createItem(.directory)
+echo 'written from macos' | sudo tee newdir/new.txt
+sudo cp hello.txt newdir/copy.txt              # create + write
+sudo mv newdir/copy.txt newdir/renamed.txt     # renameItem
+sudo ln newdir/new.txt newdir/hardlink.txt     # createLink
+sudo ln -s new.txt newdir/sym.txt              # createSymbolicLink
+sudo chmod 600 newdir/new.txt                  # setAttributes(mode)
+sudo truncate -s 1m newdir/new.txt             # grow (zero-filled)
+sudo xattr -w user.test hello newdir/new.txt   # XattrOperations
+sudo rm newdir/hardlink.txt                    # removeItem
+sudo rmdir newdir 2>&1 | grep 'not empty'      # ENOTEMPTY enforced
+sudo rm -rf newdir                             # bottom-up removal
+```
+
+After unmounting, verify integrity from Linux:
+
+```sh
+docker run --rm --privileged -v "$HOME/ext4kit-test":/w alpine sh -c \
+  "apk add --no-cache e2fsprogs >/dev/null && e2fsck -f /w/test.img"
+```
+
+A clean bill from `e2fsck -f` is expected even on `metadata_csum` images —
+lwext4 maintains all metadata checksums on write. Any finding is a real bug.
+
+### 6. Unmount and detach
 
 ```sh
 sudo umount /tmp/ext4test
@@ -241,8 +395,8 @@ Interesting categories inside the subsystem:
 : Same root cause as the hang, same fix.
 
 **`ext4_mount failed: rc=45`**
-: The test image uses `inline_data` or `metadata_csum`. Recreate it with
-  `mkfs.ext4 -O ^inline_data,^metadata_csum …`.
+: The test image uses `inline_data`. Recreate it with
+  `mkfs.ext4 -O ^inline_data …`.
 
 **`ls` shows an empty directory**
 : This was fixed — if you see it now, grab the latest source. The historical
@@ -257,8 +411,11 @@ Ext4Kit's own source code is licensed under the **MIT License** — see
 and `Ext4KitExtension/` (the Swift sources, the C block-device shim, the
 bridging header, and the project configuration).
 
-Ext4Kit statically links [lwext4](https://github.com/gkostka/lwext4), which
-is vendored under `Vendor/lwext4/` and carries **mixed file-level licensing**.
+Ext4Kit statically links [lwext4](https://github.com/gkostka/lwext4)
+(vendored as a submodule pointing at
+[rayhanadev/lwext4](https://github.com/rayhanadev/lwext4), branch
+`ext4kit-patches`, which carries one small feature-acceptance patch on top
+of upstream). lwext4 carries **mixed file-level licensing**.
 Most lwext4 sources are BSD-3-Clause, but two files (`src/ext4_extent.c` and
 `src/ext4_xattr.c`) are **GPL-2.0-or-later**. Because `ext4_extent.c` is
 load-bearing for ext4 support and is compiled into the extension binary, the

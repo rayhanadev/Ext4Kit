@@ -24,7 +24,8 @@ final class Ext4BlockDevice {
     let bdev: UnsafeMutablePointer<ext4_blockdev>
     private let iface: UnsafeMutablePointer<ext4_blockdev_iface>
     private let phbuf: UnsafeMutablePointer<UInt8>
-    private var registered = false
+    /// Non-nil while registered with lwext4's global device table.
+    private var registeredName: String?
 
     init(resource: FSBlockDeviceResource, readOnly: Bool) {
         self.resource = resource
@@ -58,8 +59,8 @@ final class Ext4BlockDevice {
     }
 
     deinit {
-        if registered {
-            _ = Self.deviceName.withCString { ext4_device_unregister($0) }
+        if let name = registeredName {
+            _ = name.withCString { ext4_device_unregister($0) }
         }
         bdev.deinitialize(count: 1)
         bdev.deallocate()
@@ -68,12 +69,14 @@ final class Ext4BlockDevice {
         phbuf.deallocate()
     }
 
-    /// Register this device with lwext4 under the global name "ext4kit0" and
-    /// plant the unmanaged self-pointer that the C shim reads from p_user.
-    func register() throws {
+    /// Register this device with lwext4 under a global table name (defaults
+    /// to "ext4kit0" for the mounted volume; maintenance ops use throwaway
+    /// names) and plant the unmanaged self-pointer the C shim reads from
+    /// p_user.
+    func register(as name: String = Ext4BlockDevice.deviceName) throws {
         // Retain self into p_user. Released on unregister().
         iface.pointee.p_user = UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque())
-        let rc = Self.deviceName.withCString { ext4_device_register(bdev, $0) }
+        let rc = name.withCString { ext4_device_register(bdev, $0) }
         if rc != EOK {
             // Balance the passRetained above.
             Unmanaged<Ext4BlockDevice>.fromOpaque(iface.pointee.p_user!).release()
@@ -81,17 +84,17 @@ final class Ext4BlockDevice {
             log.error("ext4_device_register failed: rc=\(rc, privacy: .public)")
             throw POSIXError(.EIO)
         }
-        registered = true
+        registeredName = name
     }
 
     func unregister() {
-        guard registered else { return }
-        _ = Self.deviceName.withCString { ext4_device_unregister($0) }
+        guard let name = registeredName else { return }
+        _ = name.withCString { ext4_device_unregister($0) }
         if let user = iface.pointee.p_user {
             Unmanaged<Ext4BlockDevice>.fromOpaque(user).release()
             iface.pointee.p_user = nil
         }
-        registered = false
+        registeredName = nil
     }
 
     // MARK: IO
