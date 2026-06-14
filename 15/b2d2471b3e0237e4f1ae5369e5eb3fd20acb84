@@ -1,0 +1,27 @@
+.github/SECURITY.md
+  s_05a638597b3cc6::t_524d7268f96c1f 1-34
+CHANGELOG.md
+  s_05a638597b3cc6::t_7558b2216a08d6 48-53
+CONTRIBUTING.md
+  s_05a638597b3cc6::t_72cf5b24755052 1-59
+README.md
+  s_05a638597b3cc6::t_97d91babb10688 208-213
+  s_05a638597b3cc6::t_bd9d1c402bd27b 18-23
+  s_05a638597b3cc6::t_2213f4a805f9e3 48-53,56-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "15b2d2471b3e0237e4f1ae5369e5eb3fd20acb84",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
