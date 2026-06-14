@@ -1,7 +1,5 @@
 # Ext4Kit
 
-[![CI](https://github.com/rayhanadev/Ext4Kit/actions/workflows/ci.yml/badge.svg)](https://github.com/rayhanadev/Ext4Kit/actions/workflows/ci.yml)
-
 **Native read/write ext4 for macOS.** No kernel extensions, no FUSE, no
 SIP workarounds — Ext4Kit is a userspace file system built on Apple's
 [FSKit](https://developer.apple.com/documentation/fskit), with the on-disk
@@ -38,9 +36,6 @@ sudo umount /Volumes/linux
 - **Fast** — a tuned metadata cache, 128 KiB preferred I/O size, and O(1)
   directory paging. Sequential I/O runs at hundreds of MB/s; see
   [Performance](#performance).
-- **Tested like it matters** — CI runs data-integrity verification,
-  corrupt-image fuzzing, and randomized soak tests against the bundled
-  lwext4 on every push.
 
 ## Requirements
 
@@ -60,7 +55,7 @@ cd Ext4Kit
 open Ext4Kit.xcodeproj
 ```
 
-1. Set your Development Team on both targets in *Signing & Capabilities*
+1. Set your Development Team on both targets in _Signing & Capabilities_
    (or change the bundle IDs from `com.rayhanadev.Ext4Kit*` to your own).
 2. Run the `Ext4Kit` scheme once — launching the host app registers the
    extension.
@@ -74,7 +69,7 @@ open Ext4Kit.xcodeproj
 
 ## Usage
 
-**Mount** (note: the *BSD name* without `/dev/` — `fskitd` requires it):
+**Mount** (note: the _BSD name_ without `/dev/` — `fskitd` requires it):
 
 ```sh
 diskutil list external                  # find your disk, e.g. disk4
@@ -134,11 +129,11 @@ Three measured optimizations ship in the default build (numbers from
 `Benchmarks/bench.c`, which drives the bundled lwext4 with the same call
 patterns the extension uses and counts physical device I/O):
 
-| Optimization | Effect |
-|---|---|
-| Metadata block cache, 8 → 1024 buffers (~4 MiB) | Deep-path stat: 18 device reads each → **0** on a warm cache; file creates issue 16× fewer reads |
+| Optimization                                            | Effect                                                                                                     |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Metadata block cache, 8 → 1024 buffers (~4 MiB)         | Deep-path stat: 18 device reads each → **0** on a warm cache; file creates issue 16× fewer reads           |
 | Preferred I/O size (`statfs f_iosize`), 4 KiB → 128 KiB | Sequential writes 100 → **322 MiB/s**, 33× fewer device writes (each small write is a full journal commit) |
-| O(1) directory paging (byte-offset cookies) | Paged listing of a 20 000-entry directory: 0.43 s → **0.003 s** |
+| O(1) directory paging (byte-offset cookies)             | Paged listing of a 20 000-entry directory: 0.43 s → **0.003 s**                                            |
 
 Measured and rejected: lwext4's write-back cache mode (slower than
 write-through when journaled — checkpoint churn), and journal-off mode
