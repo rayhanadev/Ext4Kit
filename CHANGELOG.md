@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased (0.1.0)
+## 0.1.0 — 2026-06-14
 
-First feature-complete cut of Ext4Kit: a read/write ext4 driver for macOS
-built on FSKit and lwext4 — no kernel extensions.
+First public beta of Ext4Kit: a read/write ext4 driver for macOS built on
+FSKit and lwext4 — no kernel extensions. Runs on macOS 15.4+ with no
+developer account. **Beta — back up your data and test on a scratch volume
+first.** The read/write path is validated against live mounts; `newfs_fskit`
+format, `fsck_fskit`, and read-only mounts are verified at the build and
+harness level but not yet against a live mount.
 
 ### Filesystem features
 - Probe, mount, unmount of ext4 block devices (`mount -F -t ext4`).
@@ -51,3 +55,10 @@ that does not grow across repeated mount/unmount cycles — `mstats` measured
 leak. `ext4_umount` tears down the block cache and journal; the extension's
 `deactivate`/`unloadResource` release the volume and device. Harmless in
 the fskitd-per-mount model regardless, since process exit reclaims it.
+
+### License
+
+Ext4Kit's own code is MIT. The distributed binary statically links lwext4
+and is therefore a combined work under GPL-2.0-or-later — complete
+corresponding source is this tag plus the pinned `Vendor/lwext4` submodule.
+See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

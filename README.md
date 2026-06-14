@@ -58,7 +58,12 @@ SIP changes. (FSKit went GA in 15.4.)
 
 ## Install
 
-Until notarized releases are published, build from source:
+Download the latest notarized build from
+[Releases](https://github.com/rayhanadev/Ext4Kit/releases), move `Ext4Kit.app`
+to your Applications folder, and open it once. Then skip to step 3 below to
+enable the extension.
+
+### Build from source
 
 ```sh
 git clone --recurse-submodules https://github.com/rayhanadev/Ext4Kit.git

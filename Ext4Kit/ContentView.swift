@@ -63,12 +63,12 @@ struct ContentView: View {
             statusLine
 
             if case .disabled = model.status {
-                Button("Open System Settings…") {
+                Button("Open System Settings") {
                     model.openSystemSettings()
                 }
                 .keyboardShortcut(.defaultAction)
                 Text(
-                    "Toggle Ext4Kit on under General → Login Items & Extensions → File System Extensions."
+                    "Turn it on under General → Login Items & Extensions → File System Extensions."
                 )
                 .font(.callout)
                 .multilineTextAlignment(.center)
@@ -76,20 +76,23 @@ struct ContentView: View {
             }
 
             if case .enabled = model.status {
-                GroupBox("Mounting a volume") {
-                    Text(
-                        """
-                        sudo mkdir -p /Volumes/ext4
-                        sudo mount -F -t ext4 diskN /Volumes/ext4
+                GroupBox("Mount a Volume") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(
+                            verbatim: """
+                                sudo mkdir -p /Volumes/ext4
+                                sudo mount -F -t ext4 diskN /Volumes/ext4
+                                """
+                        )
+                        .font(.system(.callout, design: .monospaced))
+                        .textSelection(.enabled)
 
-                        Use the BSD name (diskN, no /dev/ prefix). Unmount \
-                        with `sudo umount /Volumes/ext4`. Format a device \
-                        with `newfs_fskit -t ext4 -L LABEL /dev/diskNsM`.
-                        """
-                    )
-                    .font(.system(.callout, design: .monospaced))
-                    .multilineTextAlignment(.leading)
-                    .textSelection(.enabled)
+                        Text(
+                            "Pass the BSD name (`diskN`), not `/dev/diskN`. Unmount with `sudo umount /Volumes/ext4`."
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(4)
                 }
@@ -99,10 +102,10 @@ struct ContentView: View {
 
             HStack(spacing: 16) {
                 Link(
-                    "Source & license",
+                    "Source & License",
                     destination: URL(string: "https://github.com/rayhanadev/Ext4Kit")!)
                 Link(
-                    "Third-party licenses",
+                    "Third-Party Licenses",
                     destination: URL(
                         string:
                             "https://github.com/rayhanadev/Ext4Kit/blob/main/THIRD_PARTY_LICENSES.md"
@@ -111,7 +114,7 @@ struct ContentView: View {
             .font(.footnote)
 
             Text(
-                "Ext4Kit statically links lwext4; distributed builds are subject to GPL-2.0 terms — see Third-party licenses."
+                "Ext4Kit links lwext4, so distributed builds fall under GPL-2.0. See Third-Party Licenses."
             )
             .font(.caption2)
             .foregroundStyle(.tertiary)
@@ -148,17 +151,17 @@ struct ContentView: View {
     private var statusLine: some View {
         switch model.status {
         case .checking:
-            Text("Checking extension status…").font(.headline)
+            Text("Checking status…").font(.headline)
         case .enabled:
-            Text("File system extension is enabled.").font(.headline)
+            Text("Enabled & ready to mount.").font(.headline)
         case .disabled:
-            Text("File system extension is installed but disabled.").font(.headline)
+            Text("Ext4Kit is turned off.").font(.headline)
         case .notInstalled:
-            Text("Extension not registered yet — run this app once from its installed location, then relaunch.")
+            Text("Move Ext4Kit to your Applications folder, then open it once to register the extension.")
                 .font(.headline)
                 .multilineTextAlignment(.center)
-        case .unavailable(let why):
-            Text("Could not query FSKit: \(why)")
+        case .unavailable:
+            Text("Couldn't read the extension status. Reopen Ext4Kit to try again.")
                 .font(.headline)
                 .multilineTextAlignment(.center)
         }
