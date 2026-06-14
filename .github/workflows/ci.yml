@@ -10,7 +10,7 @@ jobs:
     name: swift-format lint
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Lint
         run: xcrun swift-format lint --strict --recursive Ext4Kit Ext4KitExtension
 
@@ -18,7 +18,7 @@ jobs:
     name: Build (Debug + Release)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -41,7 +41,7 @@ jobs:
     name: lwext4 harness (verify + fuzz + soak)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
 
