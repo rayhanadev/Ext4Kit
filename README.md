@@ -15,6 +15,12 @@ cp ~/big-file.mkv /Volumes/linux/
 sudo umount /Volumes/linux
 ```
 
+> [!WARNING]
+> **Beta software (0.1.0).** Ext4Kit writes to real ext4 volumes. Back up
+> anything you care about and test on a scratch volume first. It's tested
+> hard (see [Performance](#performance)) but it hasn't seen broad
+> real-world use yet. No warranty — see [LICENSE](LICENSE).
+
 ## Features
 
 - **Full read/write** — create, delete, rename (including over existing
@@ -39,11 +45,16 @@ sudo umount /Volumes/linux
 
 ## Requirements
 
-- **macOS 15.4+** (FSKit went GA in 15.4)
-- **Xcode 16.3+** to build
+**To run a notarized release:** just macOS 15.4+ — no developer account, no
+SIP changes. (FSKit went GA in 15.4.)
+
+**To build it yourself**, additionally:
+
+- **Xcode 16.3+**
 - **A paid Apple Developer account** — the
   `com.apple.developer.fskit.fsmodule` entitlement can't be signed by
-  free/personal teams
+  free/personal teams. This is a _build_-time requirement only; people you
+  distribute a signed, notarized build to need nothing but macOS 15.4.
 
 ## Install
 
@@ -194,7 +205,12 @@ mount -F -t ext4 disk4 /Volumes/linux
   privileges needed)
 - `Vendor/lwext4` — submodule of
   [rayhanadev/lwext4](https://github.com/rayhanadev/lwext4)
-  (`ext4kit-patches`: upstream plus one feature-acceptance patch)
+  (`ext4kit-patches`): upstream `gkostka/lwext4` plus exactly one patch —
+  [`837ef73`](https://github.com/rayhanadev/lwext4/commit/837ef73), which
+  adds `EXT4_FINCOM_BG_USE_META_CSUM` to lwext4's supported-incompat set so
+  e2fsprogs 1.47+ `metadata_csum` volumes mount. If the fork is ever
+  unavailable, apply that one-line change to upstream `include/ext4_types.h`
+  and point the submodule there.
 
 Deeper details — the open-unlink orphan scheme, directory-cookie
 verifiers, checksum-seed policy, timestamp semantics — are documented as

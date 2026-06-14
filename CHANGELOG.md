@@ -45,8 +45,9 @@ built on FSKit and lwext4 — no kernel extensions.
 See README "Not yet": no sparse files, xattr values capped at one block,
 non-UTF-8 names hidden, no kernel-offloaded I/O yet.
 
-Under investigation: the soak harness measures a bounded per-process heap
-leak after mount/unmount cycles (~5 MB at cache=1024, scaling with cache
-size; `leaks` attribution pending). Low impact in practice — fskitd runs
-the extension per mount, so process exit reclaims it — but it should be
-chased down in lwext4's teardown path.
+Note: the soak harness shows bounded heap RSS (~8.5 MB peak at cache=1024)
+that does not grow across repeated mount/unmount cycles — `mstats` measured
+0 net growth over 100 clean cycles, so it's allocator retention, not a
+leak. `ext4_umount` tears down the block cache and journal; the extension's
+`deactivate`/`unloadResource` release the volume and device. Harmless in
+the fskitd-per-mount model regardless, since process exit reclaims it.
