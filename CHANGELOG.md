@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.1 — 2026-06-14
+
+Fixes a bug where freshly formatted volumes mounted read-only.
+
+- **Formatted volumes are writable again.** The checksum-seed safety check
+  now only forces read-only when a volume actually carries metadata
+  checksums (`metadata_csum`). lwext4's mkfs sets the `csum_seed` flag
+  without `metadata_csum`, which tripped the old check — so every
+  `newfs_fskit`-formatted volume (and the benchmark images) wrongly mounted
+  read-only. Volumes whose UUID was changed after format are still protected.
+- Benchmark images now get a real UUID, and the test harness gained a
+  `--csum` check that guards both directions of this policy.
+
 ## 0.1.0 — 2026-06-14
 
 First public beta. Mount Linux ext4 drives on macOS & read & write them like

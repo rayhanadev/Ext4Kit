@@ -59,3 +59,6 @@ jobs:
 
       - name: Journal-replay crash recovery (30 trials)
         run: ./Benchmarks/bench-cache1024 "$RUNNER_TEMP/crash.img" --crash 30
+
+      - name: Checksum-seed policy
+        run: ./Benchmarks/bench-cache1024 "$RUNNER_TEMP/csum.img" --csum

@@ -29,11 +29,16 @@
  *                   child churns under deferred checkpoints and abandons
  *                   mid-stream; the parent replays and verifies a protected
  *                   sentinel survives and the fs stays walkable
+ *   --csum          instead of benchmarks: assert the checksum-seed policy —
+ *                   a freshly formatted volume mounts read-write, while a
+ *                   metadata_csum volume with a mismatched seed degrades to
+ *                   read-only
  */
 
 #include <ext4.h>
 #include <ext4_mkfs.h>
 #include <ext4_blockdev.h>
+#include <ext4_crc32.h>
 
 #include <file_dev.h>
 
@@ -123,6 +128,7 @@ static void make_image(const char *path)
 	info.block_size = 4096;
 	info.journal = true;
 	info.label = "BENCH";
+	arc4random_buf(info.uuid, sizeof(info.uuid));  // a real UUID, not zeros
 	int rc = ext4_mkfs(&fs, bd, &info, F_SET_EXT4);
 	if (rc != EOK)
 		die("ext4_mkfs", rc);
@@ -919,6 +925,79 @@ static void run_crash(const char *image, int trials)
 	       passed, trials);
 }
 
+/* -------------------------- checksum-seed policy ------------------------- */
+//
+// Mirrors Ext4Superblock.hasMismatchedChecksumSeed in the extension: a volume
+// is degraded to read-only ONLY when it carries metadata checksums
+// (metadata_csum, ro_compat 0x400) AND stores an independent seed (csum_seed,
+// incompat 0x2000) that disagrees with crc32c(~0, uuid). lwext4's own mkfs
+// sets the csum_seed bit with metadata_csum OFF and seed 0 — without the
+// metadata_csum guard, every freshly formatted volume would wrongly mount
+// read-only (the 0.1.1 fix).
+
+static uint32_t sb_le32(const uint8_t *sb, int off)
+{
+	return (uint32_t)sb[off] | (uint32_t)sb[off + 1] << 8
+		| (uint32_t)sb[off + 2] << 16 | (uint32_t)sb[off + 3] << 24;
+}
+
+static void sb_put32(uint8_t *sb, int off, uint32_t v)
+{
+	sb[off] = v & 0xff;
+	sb[off + 1] = (v >> 8) & 0xff;
+	sb[off + 2] = (v >> 16) & 0xff;
+	sb[off + 3] = (v >> 24) & 0xff;
+}
+
+static int csum_seed_degrades_ro(const uint8_t *sb)
+{
+	uint32_t incompat = sb_le32(sb, 96);
+	uint32_t rocompat = sb_le32(sb, 100);
+	uint32_t seed = sb_le32(sb, 0x270);
+	if (!(rocompat & 0x400))
+		return 0;  // no metadata_csum → no checksums to mis-seed
+	if (!(incompat & 0x2000))
+		return 0;  // no csum_seed → seed is crc32c(uuid) by definition
+	uint32_t uuid_seed = ext4_crc32c(0xFFFFFFFF, sb + 104, 16);
+	return seed != uuid_seed;
+}
+
+static void run_csum(const char *image)
+{
+	make_image(image);
+
+	int fd = open(image, O_RDWR);
+	if (fd < 0)
+		die("csum: open image", -1);
+	uint8_t sb[1024];
+	if (pread(fd, sb, sizeof(sb), 1024) != (ssize_t)sizeof(sb))
+		die("csum: read superblock", -1);
+
+	// A freshly formatted volume must mount read-write.
+	if (csum_seed_degrades_ro(sb)) {
+		fprintf(stderr,
+			"FATAL: fresh mkfs volume would mount read-only "
+			"(csum-seed false positive)\n");
+		exit(3);
+	}
+	printf("csum: fresh mkfs volume mounts read-write\n");
+
+	// True-positive guard: a metadata_csum volume whose stored seed
+	// disagrees with crc32c(uuid) must still degrade to read-only.
+	sb_put32(sb, 100, sb_le32(sb, 100) | 0x400);  // metadata_csum on
+	sb_put32(sb, 96, sb_le32(sb, 96) | 0x2000);  // csum_seed on
+	sb[104] = 0x11;  // ensure a nonzero uuid
+	sb_put32(sb, 0x270, 0xDEADBEEF);  // a seed that won't match crc32c(uuid)
+	if (!csum_seed_degrades_ro(sb)) {
+		fprintf(stderr,
+			"FATAL: metadata_csum volume with mismatched seed NOT "
+			"degraded (protection lost)\n");
+		exit(3);
+	}
+	printf("csum: metadata_csum volume with mismatched seed degrades to read-only\n");
+	close(fd);
+}
+
 static void verify_pattern(void)
 {
 	uint8_t *buf = malloc(opt_chunk);
@@ -956,7 +1035,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	const char *image = argv[1];
-	int opt_fuzz = 0, opt_soak = 0, opt_crash = 0;
+	int opt_fuzz = 0, opt_soak = 0, opt_crash = 0, opt_csum = 0;
 	uint64_t opt_fuzz_seed = 0;
 	for (int i = 2; i < argc; i++) {
 		if (!strcmp(argv[i], "--wb")) opt_wb = 1;
@@ -971,7 +1050,15 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "--fuzz-seed") && i + 1 < argc) opt_fuzz_seed = strtoull(argv[++i], NULL, 0);
 		else if (!strcmp(argv[i], "--soak") && i + 1 < argc) opt_soak = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--crash") && i + 1 < argc) opt_crash = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--csum")) opt_csum = 1;
 		else { fprintf(stderr, "unknown arg %s\n", argv[i]); return 2; }
+	}
+
+	if (opt_csum) {
+		run_csum(image);
+		if (!opt_keep)
+			unlink(image);
+		return 0;
 	}
 
 	if (opt_fuzz > 0) {

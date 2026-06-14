@@ -13,6 +13,10 @@ struct Ext4Superblock {
     /// sets this alongside `metadata_csum` by default.
     static let incompatCsumSeed: UInt32 = 0x2000
 
+    /// RO_COMPAT metadata_csum: the volume carries CRC32C checksums on its
+    /// metadata. Without it, the csum_seed is moot — there's nothing to seed.
+    static let roCompatMetadataCsum: UInt32 = 0x400
+
     // Byte offsets within the superblock structure
     private enum Offset {
         static let sState = 58  // __le16, EXT4_VALID_FS = 0x0001
@@ -77,12 +81,21 @@ struct Ext4Superblock {
     /// lwext4 maintains every metadata_csum checksum on write (group
     /// descriptors, inodes, directory tails, extent blocks, bitmaps,
     /// superblock) but always derives the seed as crc32c(~0, uuid) — it
-    /// never reads `s_checksum_seed`. On the rare volume whose UUID was
-    /// changed after format (`tune2fs -U` keeps the old seed and sets the
-    /// csum_seed bit), every checksum lwext4 wrote would be wrong. Such
-    /// volumes must be mounted read-only.
+    /// never reads `s_checksum_seed`. That only causes wrong checksums when a
+    /// volume BOTH carries metadata checksums (`metadata_csum`) AND stores an
+    /// independent seed (`csum_seed`) that disagrees with crc32c(uuid) — e.g.
+    /// a volume whose UUID was changed after format (`tune2fs -U` keeps the
+    /// old seed and sets the csum_seed bit). Only then must we mount
+    /// read-only.
+    ///
+    /// A volume with the csum_seed bit but no `metadata_csum` (which lwext4's
+    /// own mkfs produces) has no checksums to mis-seed, so it stays writable.
+    /// Without that guard, every `newfs_fskit`-formatted volume would wrongly
+    /// mount read-only.
     var hasMismatchedChecksumSeed: Bool {
-        guard featureIncompat & Self.incompatCsumSeed != 0 else { return false }
+        guard featureROCompat & Self.roCompatMetadataCsum != 0,
+            featureIncompat & Self.incompatCsumSeed != 0
+        else { return false }
         let uuidSeed = uuidBytes.withUnsafeBufferPointer { buf in
             ext4_crc32c(0xFFFF_FFFF, buf.baseAddress, UInt32(buf.count))
         }
