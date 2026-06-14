@@ -1,0 +1,34 @@
+Ext4KitExtension/Ext4Superblock.swift
+  s_05a638597b3cc6::t_3c02552c467a10 16-19
+  s_05a638597b3cc6::t_a6955fd42cf8e7 84-94,96-98
+Benchmarks/bench.c
+  s_05a638597b3cc6::t_0ecf0f836d9421 928-1000
+  s_05a638597b3cc6::t_513fe753c452f2 41
+  s_05a638597b3cc6::t_1fdbcb43634cc2 1053,1057-1061
+  s_05a638597b3cc6::t_f160a8fd774db6 1038
+  s_05a638597b3cc6::t_9c61b78b4f624f 32-35
+  s_05a638597b3cc6::t_177e8eceb91490 131
+CHANGELOG.md
+  s_05a638597b3cc6::t_38cf923931adc7 3-15
+.github/workflows/ci.yml
+  s_05a638597b3cc6::t_9262929d1f444d 62-64
+Ext4Kit.xcodeproj/project.pbxproj
+  s_05a638597b3cc6::t_aa254b2afcc767 392,426,472,521
+  s_05a638597b3cc6::t_63d7d9c3bd56c3 380,414,446,495
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "fd28b70afdc0d0b4818181dd30eceb76b730b77b",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
