@@ -1,0 +1,25 @@
+README.md
+  s_05a638597b3cc6::t_3075561f8efc05 61-66
+CHANGELOG.md
+  s_05a638597b3cc6::t_93b0dcdc281d04 3,5-10
+  s_05a638597b3cc6::t_aaef673860958c 58-64
+Ext4Kit/ContentView.swift
+  s_05a638597b3cc6::t_69442f8e5ff3e6 66,71,79-95,105,108,117
+  s_05a638597b3cc6::t_bd6807e1d51799 154,156,158,160,163-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "1f87103327ba74ce78907820948bd984ba2298fb",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
