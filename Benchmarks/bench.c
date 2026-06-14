@@ -25,6 +25,10 @@
  *   --soak SECS     instead of benchmarks: randomized mixed metadata/data ops
  *                   for SECS seconds, then remount + structural walk + data
  *                   pattern verification
+ *   --crash N       instead of benchmarks: N journal-replay trials — a forked
+ *                   child churns under deferred checkpoints and abandons
+ *                   mid-stream; the parent replays and verifies a protected
+ *                   sentinel survives and the fs stays walkable
  */
 
 #include <ext4.h>
@@ -39,6 +43,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -704,6 +709,216 @@ static void run_soak(const char *image, int seconds)
 	       (unsigned long long)ops, (unsigned long long)errs, walked);
 }
 
+/* ----------------------------- crash / replay ---------------------------- */
+//
+// A real power-loss test needs real hardware (a yanked USB stick); this is
+// the unprivileged proxy. lwext4's file_dev is unbuffered (setbuf(.,0)), so
+// writes hit the backing file synchronously and a bare process exit loses
+// nothing — to create genuine journal-replay work we enable write-back mode
+// (ext4_cache_write_back), which defers in-place *checkpoint* writes while
+// journal commit blocks still land synchronously. A child does churn under
+// write-back and _exit()s without flushing, abandoning committed-but-not-
+// checkpointed transactions in memory. The parent then mounts, runs
+// ext4_recover (which replays them), and checks two things: a sentinel file
+// written and durably committed BEFORE any churn is still byte-intact, and
+// the churn directory walks without a crash or hang. Replaying onto a
+// corrupt result, or losing the sentinel, is a fatal finding.
+
+#define CRASH_SENTINEL_SEED 0x5E47C0DEULL
+#define CRASH_SENTINEL_SIZE (256 * 1024)
+
+static const char *g_image;
+
+static void crash_write_sentinel(void)
+{
+	uint8_t *buf = malloc(CRASH_SENTINEL_SIZE);
+	fill_pattern(buf, CRASH_SENTINEL_SIZE, CRASH_SENTINEL_SEED);
+	ext4_file f;
+	if (ext4_fopen(&f, MP "sentinel.bin", "wb") != EOK)
+		die("crash: sentinel create", -1);
+	size_t w = 0;
+	if (ext4_fwrite(&f, buf, CRASH_SENTINEL_SIZE, &w) != EOK || w != CRASH_SENTINEL_SIZE)
+		die("crash: sentinel write", -1);
+	ext4_fclose(&f);
+	free(buf);
+}
+
+static int crash_check_sentinel(void)
+{
+	uint8_t *got = malloc(CRASH_SENTINEL_SIZE);
+	uint8_t *exp = malloc(CRASH_SENTINEL_SIZE);
+	fill_pattern(exp, CRASH_SENTINEL_SIZE, CRASH_SENTINEL_SEED);
+	ext4_file f;
+	int ok = 1;
+	if (ext4_fopen(&f, MP "sentinel.bin", "rb") != EOK) {
+		free(got);
+		free(exp);
+		return 0;
+	}
+	size_t r = 0;
+	if (ext4_fread(&f, got, CRASH_SENTINEL_SIZE, &r) != EOK || r != CRASH_SENTINEL_SIZE
+		|| memcmp(got, exp, CRASH_SENTINEL_SIZE) != 0)
+		ok = 0;
+	ext4_fclose(&f);
+	free(got);
+	free(exp);
+	return ok;
+}
+
+/* Child: mount, defer checkpoints, churn, abandon without unmount/flush. */
+static void crash_child(uint64_t survive_ops)
+{
+	file_dev_name_set(g_image);
+	bd = file_dev_get();
+	if (ext4_device_register(bd, "bench0") != EOK)
+		_exit(2);
+	if (ext4_mount("bench0", MP, false) != EOK)
+		_exit(2);
+	ext4_recover(MP);
+	ext4_journal_start(MP);
+	ext4_cache_write_back(MP, true);
+
+	ext4_dir_mk(MP "churn");
+	char path[128];
+	uint8_t buf[8192];
+	for (uint64_t i = 0; i < survive_ops; i++) {
+		snprintf(path, sizeof(path), MP "churn/f-%llu", (unsigned long long)(i % 256));
+		ext4_file f;
+		if (ext4_fopen(&f, path, "wb") == EOK) {
+			memset(buf, (int)(i & 0xff), sizeof(buf));
+			size_t w;
+			ext4_fwrite(&f, buf, sizeof(buf), &w);
+			ext4_fclose(&f);
+		}
+		if ((i % 5) == 0) {
+			snprintf(path, sizeof(path), MP "churn/f-%llu",
+				 (unsigned long long)((i + 7) % 256));
+			ext4_fremove(path);
+		}
+	}
+	/* Abandon. Deferred checkpoints in the in-memory bcache are lost;
+	 * committed journal transactions remain on disk for replay. */
+	_exit(0);
+}
+
+/* Parent: replay the abandoned journal and verify consistency. */
+static int crash_recover_and_check(void)
+{
+	file_dev_name_set(g_image);
+	bd = file_dev_get();
+	if (ext4_device_register(bd, "bench0") != EOK)
+		return 0;
+	if (ext4_mount("bench0", MP, false) != EOK) {
+		ext4_device_unregister("bench0");
+		return 0;
+	}
+	ext4_recover(MP);
+	ext4_journal_start(MP);
+
+	// The sentinel was durably committed before any churn, so it must
+	// survive regardless of replay — this catches replay CORRUPTING
+	// already-durable data.
+	int ok = crash_check_sentinel();
+
+	// Consistency check: every churn dirent must resolve to a live inode.
+	// A bad replay that left a dangling dirent (name pointing at a freed
+	// or never-allocated inode) fails here, not just on a crash/hang. We
+	// deliberately do NOT check churn file *contents*: lwext4 journals
+	// metadata only, so a crash can legitimately leave a recovered inode
+	// whose unjournaled data blocks never reached disk.
+	//
+	// The churn dir must also exist with real entries — otherwise a child
+	// that died before doing any work would let the trial pass vacuously.
+	ext4_dir d;
+	if (ext4_dir_open(&d, MP "churn") != EOK) {
+		fprintf(stderr, "crash: churn dir missing after replay (child did no work?)\n");
+		ok = 0;
+	} else {
+		const ext4_direntry *de;
+		char path[160];
+		int realEntries = 0;
+		while ((de = ext4_dir_entry_next(&d)) != NULL) {
+			int len = de->name_length;
+			if (len == 0)
+				continue;
+			if ((len == 1 && de->name[0] == '.')
+				|| (len == 2 && de->name[0] == '.' && de->name[1] == '.'))
+				continue;
+			realEntries++;
+			snprintf(path, sizeof(path), MP "churn/%.*s", len, (const char *)de->name);
+			uint32_t ino;
+			struct ext4_inode inode;
+			if (ext4_raw_inode_fill(path, &ino, &inode) != EOK) {
+				fprintf(stderr, "crash: dangling dirent '%s' after replay\n", path);
+				ok = 0;
+				break;
+			}
+		}
+		ext4_dir_close(&d);
+		if (ok && realEntries == 0) {
+			fprintf(stderr, "crash: churn dir empty after replay (child did no work?)\n");
+			ok = 0;
+		}
+	}
+
+	ext4_journal_stop(MP);
+	ext4_cache_flush(MP);
+	ext4_umount(MP);
+	ext4_device_unregister("bench0");
+	return ok;
+}
+
+static void run_crash(const char *image, int trials)
+{
+	g_image = image;
+
+	/* Pristine image with a durably-committed sentinel. */
+	make_image(image);
+	mount_fs();
+	crash_write_sentinel();
+	unmount_fs();
+
+	signal(SIGALRM, watchdog);
+	fuzz_rng_state = 0xC0FFEED00DULL;
+
+	int passed = 0;
+	for (int i = 0; i < trials; i++) {
+		uint64_t survive = 1 + (fuzz_rng() % 400);
+		printf("crash trial=%d/%d survive_ops=%llu\n", i + 1, trials,
+		       (unsigned long long)survive);
+		fflush(stdout);
+
+		pid_t pid = fork();
+		if (pid < 0)
+			die("crash: fork", -1);
+		if (pid == 0)
+			crash_child(survive);
+
+		int status = 0;
+		waitpid(pid, &status, 0);
+		if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+			fprintf(stderr,
+				"FATAL: crash child failed to run workload (trial %d, status=%d)\n",
+				i + 1, status);
+			exit(3);
+		}
+
+		alarm(30);
+		int ok = crash_recover_and_check();
+		alarm(0);
+		if (!ok) {
+			fprintf(stderr,
+				"FATAL: sentinel lost or fs inconsistent after replay "
+				"(trial %d, survive_ops=%llu)\n",
+				i + 1, (unsigned long long)survive);
+			exit(3);
+		}
+		passed++;
+	}
+	printf("crash: %d/%d trials recovered cleanly (sentinel intact, fs walkable)\n",
+	       passed, trials);
+}
+
 static void verify_pattern(void)
 {
 	uint8_t *buf = malloc(opt_chunk);
@@ -741,7 +956,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 	const char *image = argv[1];
-	int opt_fuzz = 0, opt_soak = 0;
+	int opt_fuzz = 0, opt_soak = 0, opt_crash = 0;
 	uint64_t opt_fuzz_seed = 0;
 	for (int i = 2; i < argc; i++) {
 		if (!strcmp(argv[i], "--wb")) opt_wb = 1;
@@ -755,6 +970,7 @@ int main(int argc, char **argv)
 		else if (!strcmp(argv[i], "--fuzz") && i + 1 < argc) opt_fuzz = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--fuzz-seed") && i + 1 < argc) opt_fuzz_seed = strtoull(argv[++i], NULL, 0);
 		else if (!strcmp(argv[i], "--soak") && i + 1 < argc) opt_soak = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--crash") && i + 1 < argc) opt_crash = atoi(argv[++i]);
 		else { fprintf(stderr, "unknown arg %s\n", argv[i]); return 2; }
 	}
 
@@ -766,6 +982,12 @@ int main(int argc, char **argv)
 	}
 	if (opt_soak > 0) {
 		run_soak(image, opt_soak);
+		if (!opt_keep)
+			unlink(image);
+		return 0;
+	}
+	if (opt_crash > 0) {
+		run_crash(image, opt_crash);
 		if (!opt_keep)
 			unlink(image);
 		return 0;

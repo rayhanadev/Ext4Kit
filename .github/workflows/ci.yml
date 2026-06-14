@@ -6,6 +6,14 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: swift-format lint
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: xcrun swift-format lint --strict --recursive Ext4Kit Ext4KitExtension
+
   build:
     name: Build (Debug + Release)
     runs-on: macos-15
@@ -48,3 +56,6 @@ jobs:
 
       - name: Mixed-op soak (15s)
         run: ./Benchmarks/bench-cache1024 "$RUNNER_TEMP/soak.img" --soak 15
+
+      - name: Journal-replay crash recovery (30 trials)
+        run: ./Benchmarks/bench-cache1024 "$RUNNER_TEMP/crash.img" --crash 30
