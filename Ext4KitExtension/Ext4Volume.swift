@@ -1772,11 +1772,14 @@ final class Ext4Volume: FSVolume,
         }
 
         let now = Self.nowSeconds()
-        let atime = request.isValid(.accessTime)
+        let atime =
+            request.isValid(.accessTime)
             ? Self.fsTime(request.accessTime.tv_sec) : now
-        let mtime = request.isValid(.modifyTime)
+        let mtime =
+            request.isValid(.modifyTime)
             ? Self.fsTime(request.modifyTime.tv_sec) : now
-        let ctime = request.isValid(.changeTime)
+        let ctime =
+            request.isValid(.changeTime)
             ? Self.fsTime(request.changeTime.tv_sec) : now
         setTimes(path: path, atime: atime, mtime: mtime, ctime: ctime)
         if request.isValid(.accessTime) { consumed.insert(.accessTime) }

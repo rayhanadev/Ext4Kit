@@ -58,7 +58,7 @@
         <key>FSFormatOptionSyntax</key>
         <dict>
             <key>shortOptions</key>
-            <string>L:b:I:N:</string>
+            <string>L:b:</string>
         </dict>
     </dict>
 </dict>

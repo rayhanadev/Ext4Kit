@@ -13,5 +13,7 @@ struct Ext4KitApp: App {
         WindowGroup {
             ContentView()
         }
+        .defaultSize(width: 480, height: 420)
+        .windowResizability(.contentSize)
     }
 }

@@ -230,7 +230,7 @@ final class Ext4FileSystem: FSUnaryFileSystem, FSUnaryFileSystemOperations,
             throw fs_errorForPOSIXError(Int32(EROFS))
         }
 
-        // FSFormatOptionSyntax "L:b:I:N:" delivers argv-style pairs.
+        // FSFormatOptionSyntax "L:b:" delivers argv-style pairs.
         var label = "ext4"
         var blockSize: UInt32 = 4096
         let opts = options.taskOptions
