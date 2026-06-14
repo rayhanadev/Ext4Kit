@@ -1,0 +1,28 @@
+.github/workflows/ci.yml
+  s_05a638597b3cc6::t_6a43501897ba6b 9-16
+  s_05a638597b3cc6::t_27b5a3094ef716 59-61
+Benchmarks/bench.c
+  s_05a638597b3cc6::t_4fee4b4ae725f6 959,973,989-990
+  s_05a638597b3cc6::t_6c311ee7db4d55 829-831,833-836,839,847,858-861
+  s_05a638597b3cc6::t_c5be41e96c5ca2 899-904
+  s_05a638597b3cc6::t_25f02d24e70708 28-31
+  s_05a638597b3cc6::t_886966d7c0e628 46
+  s_05a638597b3cc6::t_1c667e25fb82d1 712-817,821-822,832,837,856-857,862-898,905-921
+  s_05a638597b3cc6::t_56a27e542c73db 818-820,823-828,838,840-846,848-855
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "51031004936830bb4b848fbb30e063d6ea1a66a8",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
