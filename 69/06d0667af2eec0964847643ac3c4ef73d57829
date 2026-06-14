@@ -1,0 +1,19 @@
+.github/workflows/ci.yml
+  s_05a638597b3cc6::t_f4be60265fa0c5 13,21,44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "6906d0667af2eec0964847643ac3c4ef73d57829",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
