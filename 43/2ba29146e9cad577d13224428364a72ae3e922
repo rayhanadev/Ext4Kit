@@ -1,0 +1,29 @@
+Ext4KitExtension/Ext4Volume.swift
+  s_05a638597b3cc6::t_83e139c718a2c4 1775-1776,1778-1779,1781-1782
+Ext4KitExtension/Info.plist
+  s_05a638597b3cc6::t_7f22c6462c2a7e 61
+Ext4Kit/Ext4KitApp.swift
+  s_05a638597b3cc6::t_11ef06342fd82a 16-17
+Ext4Kit.xcodeproj/project.pbxproj
+  s_05a638597b3cc6::t_2f4b7327ed9c19 387,421,465,514
+  s_05a638597b3cc6::t_bf02b1c44842ff 393,427
+  s_05a638597b3cc6::t_03d1ed0f800823 392,426,472,521
+Ext4KitExtension/Ext4FileSystem.swift
+  s_05a638597b3cc6::t_5a0821dc117874 233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "432ba29146e9cad577d13224428364a72ae3e922",
+  "prompts": {},
+  "sessions": {
+    "s_05a638597b3cc6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "19325fa6-b579-4219-9b5b-3e27836cfdb9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Rayhan Noufal Arayilakath <me@rayhanadev.com>"
+    }
+  }
+}
